@@ -7,8 +7,11 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"strconv"
 
+	"github.com/gorilla/mux"
 	"github.com/mozartted/simple_todo_server/internal/config"
+	"github.com/mozartted/simple_todo_server/internal/model"
 )
 
 type RouteHandler struct {
@@ -46,7 +49,8 @@ func (r *RouteHandler) TodoListAdd(w http.ResponseWriter, rq *http.Request) {
 	// }
 
 	// w.WriteHeader(200)
-	var task config.TaskData
+	var task model.TaskData
+
 	if err := json.Unmarshal([]byte(generalString), &task); err != nil {
 		log.Fatalf("error processing json data %v", err.Error())
 	}
@@ -72,7 +76,7 @@ func (r *RouteHandler) TodoListAdd(w http.ResponseWriter, rq *http.Request) {
 func (r *RouteHandler) TodoListGet(w http.ResponseWriter, rq *http.Request) {
 	resp := config.RetrieveAll(r.Db)
 
-	response, err := json.Marshal(map[string][]config.TaskData{"todo": resp})
+	response, err := json.Marshal(map[string][]model.TaskData{"todo": resp})
 	if err != nil {
 		log.Fatalf("%s", err.Error())
 	}
@@ -82,7 +86,32 @@ func (r *RouteHandler) TodoListGet(w http.ResponseWriter, rq *http.Request) {
 }
 
 func (r *RouteHandler) TodoListUpdate(w http.ResponseWriter, rq *http.Request) {
+	resp := mux.Vars(rq)
+	category, err := strconv.ParseInt(resp["todoId"], 10, 32)
+	if err != nil {
+		log.Fatalf("%v", err.Error())
+	}
+
+	updatedList := config.UpdateStatus(r.Db, uint(category))
+	response, err := updatedList.ToJSON()
+	if err != nil {
+		log.Fatalf("%v", err.Error())
+	}
+
+	w.Write([]byte(response))
 }
 
 func (r *RouteHandler) TodoListDelete(w http.ResponseWriter, rq *http.Request) {
+	resp := mux.Vars(rq)
+	category, err := strconv.ParseInt(resp["todoId"], 10, 32)
+	if err != nil {
+		log.Fatalf("%v", err.Error())
+	}
+
+	updatedList := config.DeleteTask(r.Db, uint(category))
+
+	response, err := json.Marshal(map[string][]model.TaskData{"todo": updatedList})
+	w.WriteHeader(200)
+	w.Write(response)
+
 }

@@ -37,8 +37,8 @@ func (a *App) RunServer() {
 
 	appServer.HandleFunc("/todo", a.TodoListGet).Methods("GET")
 	appServer.HandleFunc("/todo", a.TodoListAdd).Methods("POST")
-	appServer.HandleFunc("/todo/{todoId}", a.TodoListGet).Methods("DELETE")
-	appServer.HandleFunc("/todo/{todoId}/update", a.TodoListGet).Methods("POST")
+	appServer.HandleFunc("/todo/{todoId}", a.TodoListDelete).Methods("DELETE")
+	appServer.HandleFunc("/todo/{todoId}/update", a.TodoListUpdate).Methods("POST")
 	// appServer.HandleFunc("/todo", a.TodoListGet)
 	a.httpServer = &http.Server{
 		Addr:    ":8082",

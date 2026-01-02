@@ -8,56 +8,8 @@ import (
 	"strings"
 
 	_ "github.com/mattn/go-sqlite3"
+	"github.com/mozartted/simple_todo_server/internal/model"
 )
-
-type TaskStatus int
-
-const (
-	PENDING TaskStatus = iota
-	DONE
-)
-
-func (t TaskStatus) String() string {
-	return [...]string{"PENDING", "DONE"}[t]
-}
-
-func (t TaskStatus) MarshalJSON() ([]byte, error) {
-	return json.Marshal(t.String())
-}
-
-func (t *TaskStatus) UnmarshalJSON(data []byte) error {
-	// fmt.Printf("Called UnmarshalJSON: %v", data)
-	var s string
-	err := json.Unmarshal(data, &s)
-	if err != nil {
-		return err
-	}
-
-	switch s {
-	case "PENDING":
-		*t = PENDING
-	case "DONE":
-		*t = DONE
-	default:
-		return fmt.Errorf("invalid status type:  %v", s)
-	}
-	return nil
-}
-
-type TaskData struct {
-	Name string `json:"id"`
-	// Description string     `json:"description"`
-	Status TaskStatus `json:"status"`
-}
-
-func (t TaskData) toJSON() (string, error) {
-	data, err := json.Marshal(t)
-	if err != nil {
-		return "", err
-	}
-
-	return string(data), nil
-}
 
 func DbConnect() (*sql.DB, error) {
 	db, err := sql.Open("sqlite3", "./db.sqlite")
@@ -91,8 +43,8 @@ func InitialDBMigration(db *sql.DB) error {
 	return nil
 }
 
-func SaveTodoData(db *sql.DB, task TaskData) error {
-	preprocessedTask, e := task.toJSON()
+func SaveTodoData(db *sql.DB, task model.TaskData) error {
+	preprocessedTask, e := task.ToJSON()
 	if e != nil {
 		log.Fatalf("%s", e.Error())
 	}
@@ -112,28 +64,77 @@ func SaveTodoData(db *sql.DB, task TaskData) error {
 	return nil
 }
 
-func RetrieveAll(dbC *sql.DB) []TaskData {
-	row, err := dbC.Query("select todoSet from todoList")
+func RetrieveAll(dbC *sql.DB) []model.TaskData {
+	row, err := dbC.Query("select todoSet, id  from todoList")
 	if err != nil {
 		fmt.Printf("Other Error print %v", err.Error())
 		log.Fatalf("%s", err.Error())
 	}
 
-	var todoTaskList []TaskData
+	var todoTaskList []model.TaskData
 
 	for row.Next() {
 		var todoSet string
-		if err := row.Scan(&todoSet); err != nil {
+		var todoId uint
+		if err := row.Scan(&todoSet, &todoId); err != nil {
 			log.Fatalf("%s", err.Error())
 		}
 
-		var currentTaskData TaskData
+		var currentTaskData model.TaskData
 		if err := json.Unmarshal([]byte(todoSet), &currentTaskData); err != nil {
 			log.Fatalf("%s", err.Error())
 		}
+		currentTaskData.Id = todoId
 		todoTaskList = append(todoTaskList, currentTaskData)
 
 	}
 
 	return todoTaskList
+}
+
+func DeleteTask(dbc *sql.DB, index uint) []model.TaskData {
+	row, err := dbc.Prepare("delete from todoList where id=?")
+	if err != nil {
+		log.Fatalf("Something went wrong: %v", err.Error())
+	}
+
+	if _, err := row.Exec(index); err != nil {
+		log.Fatalf("Something went wrong: %v", err.Error())
+	}
+
+	return RetrieveAll(dbc)
+
+}
+
+func UpdateStatus(dbc *sql.DB, index uint) model.TaskData {
+	row, err := dbc.Query(fmt.Sprintf("select todoSet, id from todoList where id=%d", index))
+	if err != nil {
+		log.Fatalf("Something went wrong: %v", err.Error())
+	}
+	var currentTaskData model.TaskData
+
+	for row.Next() {
+		var id uint
+		var todoSet string
+		if err := row.Scan(&todoSet, &id); err != nil {
+			log.Fatalf("%s", err.Error())
+		}
+
+		if err := json.Unmarshal([]byte(todoSet), &currentTaskData); err != nil {
+			log.Fatalf("%s", err.Error())
+		}
+
+		switch currentTaskData.Status {
+		case model.PENDING:
+			currentTaskData.Status = model.DONE
+		case model.DONE:
+			currentTaskData.Status = model.PENDING
+		default:
+			continue
+		}
+
+		SaveTodoData(dbc, currentTaskData)
+
+	}
+	return currentTaskData
 }
