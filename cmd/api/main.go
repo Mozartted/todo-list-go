@@ -73,7 +73,6 @@ func (a *App) RunServer() {
 
 	}
 
-	// <-ctx.
 }
 
 func main() {

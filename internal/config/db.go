@@ -117,11 +117,11 @@ func UpdateStatus(dbc *sql.DB, index uint) model.TaskData {
 		var id uint
 		var todoSet string
 		if err := row.Scan(&todoSet, &id); err != nil {
-			log.Fatalf("%s", err.Error())
+			log.Fatalf(" Scan error %s", err.Error())
 		}
 
 		if err := json.Unmarshal([]byte(todoSet), &currentTaskData); err != nil {
-			log.Fatalf("%s", err.Error())
+			log.Fatalf("Interned error %s", err.Error())
 		}
 
 		switch currentTaskData.Status {
@@ -133,8 +133,19 @@ func UpdateStatus(dbc *sql.DB, index uint) model.TaskData {
 			continue
 		}
 
-		SaveTodoData(dbc, currentTaskData)
+		currentTaskData.Id = index
 
+		todoStructString, err := currentTaskData.ToJSON()
+		if err != nil {
+			log.Fatalf(" Extra erro %s", err.Error())
+		}
+		fmt.Printf("todoStruct string  %s", todoStructString)
+
+		if _, err := dbc.Query(fmt.Sprintf("update todoList set todoSet = '%s' where id = %d", todoStructString, index)); err != nil {
+			log.Fatalf("Extended error %s", err.Error())
+		}
+
+		// SaveTodoData(dbc, currentTaskData)
 	}
 	return currentTaskData
 }
