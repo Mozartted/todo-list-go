@@ -72,7 +72,6 @@ func (a *App) RunServer() {
 		log.Println("Graceful shutdown in process")
 
 	}
-
 }
 
 func main() {

@@ -6,10 +6,16 @@ import (
 	"fmt"
 	"log"
 	"strings"
+	"sync"
 
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/mozartted/simple_todo_server/internal/model"
 )
+
+type DbSync struct {
+	DbSync sync.Mutex
+	Db     *sql.DB
+}
 
 func DbConnect() (*sql.DB, error) {
 	db, err := sql.Open("sqlite3", "./db.sqlite")
@@ -103,11 +109,14 @@ func DeleteTask(dbc *sql.DB, index uint) []model.TaskData {
 	}
 
 	return RetrieveAll(dbc)
-
 }
 
 func UpdateStatus(dbc *sql.DB, index uint) model.TaskData {
-	row, err := dbc.Query(fmt.Sprintf("select todoSet, id from todoList where id=%d", index))
+	tx, err := dbc.Begin()
+	if err != nil {
+		log.Fatal("Something ent wrong Looking L`")
+	}
+	row, err := tx.Query(fmt.Sprintf("select todoSet, id from todoList where id=%d", index))
 	if err != nil {
 		log.Fatalf("Something went wrong: %v", err.Error())
 	}
@@ -141,8 +150,17 @@ func UpdateStatus(dbc *sql.DB, index uint) model.TaskData {
 		}
 		fmt.Printf("todoStruct string  %s", todoStructString)
 
-		if _, err := dbc.Query(fmt.Sprintf("update todoList set todoSet = '%s' where id = %d", todoStructString, index)); err != nil {
+		execFunc, err := tx.Prepare(fmt.Sprintf("update todoList set todoSet = '%s' where id = %d", todoStructString, index))
+		if err != nil {
 			log.Fatalf("Extended error %s", err.Error())
+		}
+
+		if _, err := execFunc.Exec(); err != nil {
+			log.Fatalf("Extended error %s", err.Error())
+		}
+
+		if err := tx.Commit(); err != nil {
+			log.Fatalf("%v", err)
 		}
 
 		// SaveTodoData(dbc, currentTaskData)

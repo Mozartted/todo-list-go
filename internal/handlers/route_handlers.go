@@ -15,6 +15,7 @@ import (
 )
 
 type RouteHandler struct {
+	// Db config.DbSync
 	Db *sql.DB
 }
 
@@ -113,5 +114,4 @@ func (r *RouteHandler) TodoListDelete(w http.ResponseWriter, rq *http.Request) {
 	response, err := json.Marshal(map[string][]model.TaskData{"todo": updatedList})
 	w.WriteHeader(200)
 	w.Write(response)
-
 }
